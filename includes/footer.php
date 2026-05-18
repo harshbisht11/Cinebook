@@ -1,6 +1,6 @@
-</main>
+</div><!-- /.main-content -->
 <footer>
-  <p>🎬 <?= SITE_NAME ?> &nbsp;·&nbsp; Built with PHP &amp; MySQL</p>
+  <p>Made with ❤️ &nbsp;·&nbsp; <strong><?= SITE_NAME ?></strong> &nbsp;·&nbsp; Movie Ticket Booking</p>
 </footer>
 </body>
 </html>
