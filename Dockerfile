@@ -28,4 +28,4 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # NOTE: ports.conf is written at runtime by entrypoint.sh — do NOT write it here
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]"# force rebuild $(date)" 
