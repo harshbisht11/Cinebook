@@ -3,8 +3,9 @@
 set -e
 
 # Read DB vars — Railway MySQL plugin or manual overrides
+# NOTE: Use DB_PORT instead of PORT to avoid overwriting Railway's PORT=8080
 HOST="${MYSQLHOST:-${DB_HOST:-localhost}}"
-DB_PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
+DB_PORT="${MYSQLPORT:-3306}"
 USER="${MYSQLUSER:-${DB_USER:-root}}"
 PASS="${MYSQLPASSWORD:-${DB_PASS:-}}"
 DB="${MYSQLDATABASE:-${DB_NAME:-movie_booking}}"
@@ -30,7 +31,7 @@ done
 mysql -h"$HOST" -P"$DB_PORT" -u"$USER" ${PASS:+-p"$PASS"} -e \
     "CREATE DATABASE IF NOT EXISTS \`$DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || true
 
-# FIX: ensure TABLES is always a valid integer (was crashing with "integer expression expected")
+# FIX: always produce a valid integer — guard against empty output
 TABLES=$(mysql -h"$HOST" -P"$DB_PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
     -e "SHOW TABLES LIKE 'movies';" 2>/dev/null | grep -c movies || echo "0")
 TABLES="${TABLES:-0}"
@@ -46,7 +47,6 @@ fi
 
 # ─── Set Apache port ──────────────────────────────────────────────────────────
 echo "Listen $SITE_PORT" > /etc/apache2/ports.conf
-sed -i "s|\${PORT}|$SITE_PORT|g" /etc/apache2/sites-enabled/000-default.conf 2>/dev/null || true
 sed -i "s|<VirtualHost \*:[0-9]*>|<VirtualHost *:$SITE_PORT>|g" \
     /etc/apache2/sites-enabled/000-default.conf 2>/dev/null || true
 

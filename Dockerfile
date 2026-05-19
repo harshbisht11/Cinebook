@@ -2,7 +2,7 @@
 FROM php:8.2-apache
 
 # Install MySQLi and required tools
-# Explicitly disable conflicting MPMs and enable only prefork (required for php)
+# Force mpm_prefork (required for PHP) and disable conflicting MPMs
 RUN apt-get update && apt-get install -y \
     default-mysql-client \
     && docker-php-ext-install mysqli \
@@ -26,6 +26,6 @@ RUN mkdir -p /var/www/html/uploads \
 COPY docker-entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# NOTE: ports.conf is written at runtime by entrypoint.sh — do NOT write it here
+# ports.conf is written at runtime by entrypoint.sh — NOT here
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]"# force rebuild $(date)" 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
