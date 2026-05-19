@@ -1,37 +1,54 @@
 #!/bin/bash
-HOST="${MYSQLHOST:-localhost}"
-PORT="${MYSQLPORT:-3306}"
-USER="${MYSQLUSER:-root}"
-PASS="${MYSQLPASSWORD:-}"
-DB="${MYSQLDATABASE:-movie_booking}"
+# ─── CineBook docker entrypoint ──────────────────────────────────────────────
+set -e
 
-echo "🎬 CineBook starting..."
+# Read DB vars — Railway MySQL plugin or manual overrides
+HOST="${MYSQLHOST:-${DB_HOST:-localhost}}"
+PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
+USER="${MYSQLUSER:-${DB_USER:-root}}"
+PASS="${MYSQLPASSWORD:-${DB_PASS:-}}"
+DB="${MYSQLDATABASE:-${DB_NAME:-movie_booking}}"
+SITE_PORT="${PORT:-8080}"
+
+echo "🎬 CineBook starting on port $SITE_PORT..."
 echo "🗄  Database: $USER@$HOST:$PORT/$DB"
 
-MYSQL_OPTS="-h$HOST -P$PORT -u$USER"
-[ -n "$PASS" ] && MYSQL_OPTS="$MYSQL_OPTS -p$PASS"
-MYSQL_OPTS="$MYSQL_OPTS --ssl-mode=DISABLED"
-
+# ─── Wait for MySQL ───────────────────────────────────────────────────────────
 echo "⏳ Waiting for MySQL..."
 for i in $(seq 1 30); do
-    if mysqladmin ping $MYSQL_OPTS --silent 2>/dev/null; then
-        echo "✅ MySQL ready!"
+    if mysqladmin ping -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} --silent 2>/dev/null; then
+        echo "✅ MySQL is ready!"
         break
     fi
-    [ "$i" -eq 30 ] && echo "⚠️ MySQL timeout, continuing..."
+    if [ "$i" -eq 30 ]; then
+        echo "❌ MySQL not reachable after 60s. Continuing anyway..."
+    fi
     sleep 2
 done
 
-mysql $MYSQL_OPTS -e "CREATE DATABASE IF NOT EXISTS \`$DB\`;" 2>/dev/null || true
+# ─── Auto-create DB and run schema if needed ──────────────────────────────────
+mysql -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} -e \
+    "CREATE DATABASE IF NOT EXISTS \`$DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || true
 
-TABLES=$(mysql $MYSQL_OPTS "$DB" -e "SHOW TABLES LIKE 'movies';" 2>/dev/null | grep -c movies || echo "0")
+# FIX: ensure TABLES is always a valid integer (was crashing with "integer expression expected")
+TABLES=$(mysql -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
+    -e "SHOW TABLES LIKE 'movies';" 2>/dev/null | grep -c movies || echo "0")
+TABLES="${TABLES:-0}"
 
-if [ "$TABLES" -eq "0" ]; then
-    echo "🏗  Setting up database..."
-    mysql $MYSQL_OPTS "$DB" < /var/www/html/sql/database.sql 2>/dev/null && echo "✅ Done!" || echo "⚠️ Schema warning"
+if [ "$TABLES" -eq 0 ]; then
+    echo "🏗  Running database schema setup..."
+    mysql -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
+        < /var/www/html/sql/database.sql
+    echo "✅ Schema applied with sample data!"
 else
-    echo "✅ Database ready."
+    echo "✅ Database already set up, skipping schema."
 fi
 
-echo "🚀 Starting Apache on port 8080..."
+# ─── Set Apache port ──────────────────────────────────────────────────────────
+echo "Listen $SITE_PORT" > /etc/apache2/ports.conf
+sed -i "s|\${PORT}|$SITE_PORT|g" /etc/apache2/sites-enabled/000-default.conf 2>/dev/null || true
+sed -i "s|<VirtualHost \*:[0-9]*>|<VirtualHost *:$SITE_PORT>|g" \
+    /etc/apache2/sites-enabled/000-default.conf 2>/dev/null || true
+
+echo "🚀 Starting Apache on port $SITE_PORT..."
 exec apache2-foreground

@@ -1,38 +1,31 @@
+# ─── CineBook — Railway Dockerfile ───────────────────────────────────────────
 FROM php:8.2-apache
 
+# Install MySQLi and required tools
+# Explicitly disable conflicting MPMs and enable only prefork (required for php)
 RUN apt-get update && apt-get install -y \
     default-mysql-client \
     && docker-php-ext-install mysqli \
+    && a2dismod mpm_event mpm_worker 2>/dev/null || true \
+    && a2enmod mpm_prefork rewrite \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Fix MPM issue
-RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
-RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
-          /etc/apache2/mods-enabled/mpm_event.load \
-          /etc/apache2/mods-enabled/mpm_worker.conf \
-          /etc/apache2/mods-enabled/mpm_worker.load 2>/dev/null || true
-RUN a2enmod mpm_prefork rewrite
+# Allow .htaccess overrides
+RUN sed -i 's|AllowOverride None|AllowOverride All|g' /etc/apache2/apache2.conf
 
-# Set port 8080
-RUN echo "Listen 8080" > /etc/apache2/ports.conf \
-    && sed -i 's|<VirtualHost \*:80>|<VirtualHost *:8080>|g' \
-       /etc/apache2/sites-enabled/000-default.conf \
-    && sed -i 's|AllowOverride None|AllowOverride All|g' \
-       /etc/apache2/apache2.conf
-
-# Remove default page
-RUN rm -f /var/www/html/index.html
-
-# Copy app
+# Copy app into web root
 COPY . /var/www/html/
 
-RUN chown -R www-data:www-data /var/www/html \
+# Ensure uploads directory is writable
+RUN mkdir -p /var/www/html/uploads \
+    && chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
-    && mkdir -p /var/www/html/uploads \
-    && chmod 775 /var/www/html/uploads
+    && chmod -R 775 /var/www/html/uploads
 
-COPY docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy and enable entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# NOTE: ports.conf is written at runtime by entrypoint.sh — do NOT write it here
 EXPOSE 8080
-CMD ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
