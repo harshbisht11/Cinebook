@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y \
     default-mysql-client \
     && docker-php-ext-install mysqli \
     && a2enmod rewrite \
+    && a2dismod mpm_event || true \
+    && a2enmod mpm_prefork \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i 's|AllowOverride None|AllowOverride All|g' /etc/apache2/apache2.conf
