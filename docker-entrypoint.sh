@@ -4,19 +4,19 @@ set -e
 
 # Read DB vars — Railway MySQL plugin or manual overrides
 HOST="${MYSQLHOST:-${DB_HOST:-localhost}}"
-PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
+DB_PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
 USER="${MYSQLUSER:-${DB_USER:-root}}"
 PASS="${MYSQLPASSWORD:-${DB_PASS:-}}"
 DB="${MYSQLDATABASE:-${DB_NAME:-movie_booking}}"
 SITE_PORT="${PORT:-8080}"
 
 echo "🎬 CineBook starting on port $SITE_PORT..."
-echo "🗄  Database: $USER@$HOST:$PORT/$DB"
+echo "🗄  Database: $USER@$HOST:$DB_PORT/$DB"
 
 # ─── Wait for MySQL ───────────────────────────────────────────────────────────
 echo "⏳ Waiting for MySQL..."
 for i in $(seq 1 30); do
-    if mysqladmin ping -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} --silent 2>/dev/null; then
+    if mysqladmin ping -h"$HOST" -P"$DB_PORT" -u"$USER" ${PASS:+-p"$PASS"} --silent 2>/dev/null; then
         echo "✅ MySQL is ready!"
         break
     fi
@@ -27,17 +27,17 @@ for i in $(seq 1 30); do
 done
 
 # ─── Auto-create DB and run schema if needed ──────────────────────────────────
-mysql -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} -e \
+mysql -h"$HOST" -P"$DB_PORT" -u"$USER" ${PASS:+-p"$PASS"} -e \
     "CREATE DATABASE IF NOT EXISTS \`$DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || true
 
 # FIX: ensure TABLES is always a valid integer (was crashing with "integer expression expected")
-TABLES=$(mysql -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
+TABLES=$(mysql -h"$HOST" -P"$DB_PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
     -e "SHOW TABLES LIKE 'movies';" 2>/dev/null | grep -c movies || echo "0")
 TABLES="${TABLES:-0}"
 
 if [ "$TABLES" -eq 0 ]; then
     echo "🏗  Running database schema setup..."
-    mysql -h"$HOST" -P"$PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
+    mysql -h"$HOST" -P"$DB_PORT" -u"$USER" ${PASS:+-p"$PASS"} "$DB" \
         < /var/www/html/sql/database.sql
     echo "✅ Schema applied with sample data!"
 else
