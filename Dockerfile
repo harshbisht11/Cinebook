@@ -1,24 +1,27 @@
-FROM php:8.2-apache
+FROM ubuntu:22.04
 
-# Install dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y \
-    default-mysql-client \
-    && docker-php-ext-install mysqli \
+    apache2 \
+    php8.1 \
+    php8.1-mysqli \
+    libapache2-mod-php8.1 \
+    mysql-client \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Fix MPM conflict completely
-RUN rm -f /etc/apache2/mods-enabled/mpm_* \
-    && ln -s /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf \
-    && ln -s /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load \
-    && a2enmod rewrite
+# Enable rewrite
+RUN a2enmod rewrite
 
-# Allow .htaccess
-RUN sed -i 's|AllowOverride None|AllowOverride All|g' /etc/apache2/apache2.conf
-
-# Set port to 8080
+# Configure Apache port 8080
 RUN echo "Listen 8080" > /etc/apache2/ports.conf \
-    && sed -i 's|<VirtualHost \*:80>|<VirtualHost *:8080>|g' \
-       /etc/apache2/sites-enabled/000-default.conf
+    && echo '<VirtualHost *:8080>\n\
+    DocumentRoot /var/www/html\n\
+    <Directory /var/www/html>\n\
+        AllowOverride All\n\
+        Require all granted\n\
+    </Directory>\n\
+</VirtualHost>' > /etc/apache2/sites-enabled/000-default.conf
 
 COPY . /var/www/html/
 
