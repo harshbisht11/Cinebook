@@ -1,36 +1,38 @@
-FROM ubuntu:22.04
-
-ENV DEBIAN_FRONTEND=noninteractive
+FROM php:8.2-apache
 
 RUN apt-get update && apt-get install -y \
-    apache2 \
-    php8.1 \
-    php8.1-mysqli \
-    libapache2-mod-php8.1 \
-    mysql-client \
+    default-mysql-client \
+    && docker-php-ext-install mysqli \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Enable rewrite
-RUN a2enmod rewrite
+# Fix MPM issue
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
+          /etc/apache2/mods-enabled/mpm_event.load \
+          /etc/apache2/mods-enabled/mpm_worker.conf \
+          /etc/apache2/mods-enabled/mpm_worker.load 2>/dev/null || true
+RUN a2enmod mpm_prefork rewrite
 
-# Configure Apache port 8080
+# Set port 8080
 RUN echo "Listen 8080" > /etc/apache2/ports.conf \
-    && echo '<VirtualHost *:8080>\nDocumentRoot /var/www/html\nServerName localhost\n<Directory /var/www/html>\nAllowOverride All\nRequire all granted\nOptions -Indexes\n</Directory>\n</VirtualHost>' \
-    > /etc/apache2/sites-enabled/000-default.conf
+    && sed -i 's|<VirtualHost \*:80>|<VirtualHost *:8080>|g' \
+       /etc/apache2/sites-enabled/000-default.conf \
+    && sed -i 's|AllowOverride None|AllowOverride All|g' \
+       /etc/apache2/apache2.conf
 
-# Remove default Apache page BEFORE copying our files
+# Remove default page
 RUN rm -f /var/www/html/index.html
 
-# Copy our app files
+# Copy app
 COPY . /var/www/html/
 
-RUN mkdir -p /var/www/html/uploads \
-    && chown -R www-data:www-data /var/www/html \
+RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
-    && chmod -R 775 /var/www/html/uploads
+    && mkdir -p /var/www/html/uploads \
+    && chmod 775 /var/www/html/uploads
 
-COPY docker-entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/entrypoint.sh"]
