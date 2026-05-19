@@ -6,9 +6,8 @@ PORT="${MYSQLPORT:-3306}"
 USER="${MYSQLUSER:-root}"
 PASS="${MYSQLPASSWORD:-}"
 DB="${MYSQLDATABASE:-movie_booking}"
-SITE_PORT="${PORT:-8080}"
 
-echo "🎬 CineBook starting on port $SITE_PORT..."
+echo "🎬 CineBook starting..."
 echo "🗄  Database: $USER@$HOST:$PORT/$DB"
 
 # Wait for MySQL
@@ -19,7 +18,7 @@ for i in $(seq 1 30); do
         break
     fi
     if [ "$i" -eq 30 ]; then
-        echo "❌ MySQL not reachable after 60s. Continuing anyway..."
+        echo "❌ MySQL not reachable. Continuing..."
     fi
     sleep 2
 done
@@ -40,10 +39,5 @@ else
     echo "✅ Database already set up."
 fi
 
-# Set Apache port
-echo "Listen 8080" > /etc/apache2/ports.conf
-sed -i "s|<VirtualHost \*:[0-9]*>|<VirtualHost *:8080>|g" \
-    /etc/apache2/sites-enabled/000-default.conf 2>/dev/null || true
-
-echo "🚀 Starting Apache on port 8080..."
+echo "🚀 Starting Apache..."
 exec apache2-foreground
