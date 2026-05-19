@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y \
 # Enable rewrite
 RUN a2enmod rewrite
 
+# Remove default Apache page
+RUN rm -rf /var/www/html/*
+
 # Configure Apache port 8080
 RUN echo "Listen 8080" > /etc/apache2/ports.conf \
     && echo '<VirtualHost *:8080>\n\
@@ -20,9 +23,12 @@ RUN echo "Listen 8080" > /etc/apache2/ports.conf \
     <Directory /var/www/html>\n\
         AllowOverride All\n\
         Require all granted\n\
+        Options -Indexes\n\
     </Directory>\n\
+    ServerName localhost\n\
 </VirtualHost>' > /etc/apache2/sites-enabled/000-default.conf
 
+# Copy app files
 COPY . /var/www/html/
 
 RUN mkdir -p /var/www/html/uploads \
